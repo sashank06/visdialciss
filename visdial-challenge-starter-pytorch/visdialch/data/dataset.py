@@ -25,7 +25,7 @@ class VisDialDataset(Dataset):
         config: Dict[str, Any],
         dialogs_jsonpath: str,
         dense_annotations_jsonpath: Optional[str] = None,
-        overfit: bool = False,
+        overfit: int = 0,
         in_memory: bool = False,
         return_options: bool = True,
         add_boundary_toks: bool = False,
@@ -61,7 +61,7 @@ class VisDialDataset(Dataset):
         # Keep a list of image_ids as primary keys to access data.
         self.image_ids = list(self.dialogs_reader.dialogs.keys())
         if overfit:
-            self.image_ids = self.image_ids[:5]
+            self.image_ids = self.image_ids[:int(overfit)]
 
     @property
     def split(self):

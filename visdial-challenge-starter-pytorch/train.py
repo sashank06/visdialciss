@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import yaml
 from bisect import bisect
+import numpy as np
 
 from visdialch.data.dataset import VisDialDataset
 from visdialch.encoders import Encoder
@@ -17,6 +18,7 @@ from visdialch.metrics import SparseGTMetrics, NDCG
 from visdialch.model import EncoderDecoderModel
 from visdialch.utils.checkpointing import CheckpointManager, load_checkpoint
 
+import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -60,8 +62,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--overfit",
-    action="store_true",
-    help="Overfit model on 5 examples, meant for debugging.",
+    type=int,
+    help="Overfit model on N examples, meant for debugging.",
 )
 parser.add_argument(
     "--validate",
@@ -79,7 +81,7 @@ parser.add_argument(
 parser.add_argument_group("Checkpointing related arguments")
 parser.add_argument(
     "--save-dirpath",
-    default="checkpoints/",
+    default=f"checkpoints/{datetime.datetime.now().isoformat()}",
     help="Path of directory to create checkpoint directory and save "
     "checkpoints.",
 )
@@ -132,6 +134,9 @@ train_dataset = VisDialDataset(
     return_options=True if config["model"]["decoder"] == "disc" else False,
     add_boundary_toks=False if config["model"]["decoder"] == "disc" else True,
 )
+print('Length of train dataset:', len(train_dataset))
+n_batches_per_epoch = int(np.ceil(len(train_dataset) / config["solver"]["batch_size"]))
+
 train_dataloader = DataLoader(
     train_dataset,
     batch_size=config["solver"]["batch_size"],
@@ -251,7 +256,7 @@ for epoch in range(start_epoch, config["solver"]["num_epochs"]):
         combined_dataloader = itertools.chain(train_dataloader)
 
     print(f"\nTraining for epoch {epoch}:")
-    for i, batch in enumerate(tqdm(combined_dataloader)):
+    for i, batch in enumerate(tqdm(combined_dataloader, total=n_batches_per_epoch)):
         for key in batch:
             batch[key] = batch[key].to(device)
 
