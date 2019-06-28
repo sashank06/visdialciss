@@ -16,6 +16,9 @@ class EncoderDecoderModel(nn.Module):
         self.decoder = decoder
 
     def forward(self, batch):
-        encoder_output = self.encoder(batch)
+        #encoder_output = self.encoder(batch)
+        encoder_output, attention_weights = self.encoder(batch)
         decoder_output = self.decoder(encoder_output, batch)
-        return decoder_output
+        
+        #return decoder_output
+        return decoder_output, attention_weights

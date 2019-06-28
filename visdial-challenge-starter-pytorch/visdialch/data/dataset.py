@@ -77,6 +77,10 @@ class VisDialDataset(Dataset):
         # Get image features for this image_id using hdf reader.
         image_features = self.hdf_reader[image_id]
         image_features = torch.tensor(image_features)
+        
+        # New features format
+        image_features = image_features.view((-1, 64)).t()
+        
         # Normalize image features at zero-th dimension (since there's no batch
         # dimension).
         if self.config["img_norm"]:

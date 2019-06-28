@@ -19,9 +19,6 @@ from visdialch.model import EncoderDecoderModel
 from visdialch.utils.checkpointing import CheckpointManager, load_checkpoint
 
 import datetime
-import os
-import pickle
-import code
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -264,8 +261,7 @@ for epoch in range(start_epoch, config["solver"]["num_epochs"]):
             batch[key] = batch[key].to(device)
 
         optimizer.zero_grad()
-        #output = model(batch)
-        output, attention_weights = model(batch)
+        output = model(batch)
         target = (
             batch["ans_ind"]
             if config["model"]["decoder"] == "disc"
@@ -287,9 +283,6 @@ for epoch in range(start_epoch, config["solver"]["num_epochs"]):
         scheduler.step(global_iteration_step)
         global_iteration_step += 1
         torch.cuda.empty_cache()
-        
-        # inspect code
-        #code.interact(local=locals())
 
     # -------------------------------------------------------------------------
     #   ON EPOCH END  (checkpointing and validation)
@@ -307,13 +300,7 @@ for epoch in range(start_epoch, config["solver"]["num_epochs"]):
             for key in batch:
                 batch[key] = batch[key].to(device)
             with torch.no_grad():
-                #output = model(batch)
-                output, attention_weights = model(batch)
-                with open(os.path.join(args.save_dirpath, f'testbatch_{epoch}.pkl'), 'wb') as file:
-                    batch_dict = {
-                        key: val.detach().cpu().numpy() for key, val in batch.items()
-                    }
-                    pickle.dump((batch_dict, attention_weights.detach().cpu().numpy()), file)
+                output = model(batch)
             sparse_metrics.observe(output, batch["ans_ind"])
             if "gt_relevance" in batch:
                 output = output[

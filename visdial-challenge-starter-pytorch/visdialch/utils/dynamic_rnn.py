@@ -47,6 +47,7 @@ class DynamicRNN(nn.Module):
         h_n = h_n[-1].index_select(dim=0, index=bwd_order)
         c_n = c_n[-1].index_select(dim=0, index=bwd_order)
 
+                
         outputs = pad_packed_sequence(
             outputs, batch_first=True, total_length=max_sequence_length
         )
@@ -54,6 +55,7 @@ class DynamicRNN(nn.Module):
 
     @staticmethod
     def _get_sorted_order(lens):
+
         sorted_len, fwd_order = torch.sort(
             lens.contiguous().view(-1), 0, descending=True
         )

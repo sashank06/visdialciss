@@ -29,12 +29,20 @@ class LateFusionEncoder(nn.Module):
             batch_first=True,
             dropout=config["dropout"],
         )
+        self.caption_rnn = nn.LSTM(
+            config["word_embedding_size"],
+            config["lstm_hidden_size"],
+            config["lstm_num_layers"],
+            batch_first=True,
+            dropout=config["dropout"],
+        )
         self.dropout = nn.Dropout(p=config["dropout"])
 
         # questions and history are right padded sequences of variable length
         # use the DynamicRNN utility module to handle them properly
         self.hist_rnn = DynamicRNN(self.hist_rnn)
         self.ques_rnn = DynamicRNN(self.ques_rnn)
+        self.caption_rnn = DynamicRNN(self.caption_rnn)
 
         # project image features to lstm_hidden_size for computing attention
         self.image_features_projection = nn.Linear(
@@ -46,7 +54,7 @@ class LateFusionEncoder(nn.Module):
 
         # fusion layer (attended_image_features + question + history)
         fusion_size = (
-            config["img_feature_size"] + config["lstm_hidden_size"] * 2
+            config["lstm_hidden_size"] * 2
         )
         self.fusion = nn.Linear(fusion_size, config["lstm_hidden_size"])
 
@@ -64,6 +72,8 @@ class LateFusionEncoder(nn.Module):
         # shape: (batch_size, 10, max_sequence_length * 2 * 10)
         # concatenated qa * 10 rounds
         hist = batch["hist"]
+        #get caption
+        caption = hist[:,0,:]
         # num_rounds = 10, even for test (padded dialog rounds at the end)
         batch_size, num_rounds, max_sequence_length = ques.size()
 
@@ -77,11 +87,11 @@ class LateFusionEncoder(nn.Module):
 
         # project down image features and ready for attention
         # shape: (batch_size, num_proposals, lstm_hidden_size)
-        projected_image_features = self.image_features_projection(img)
+        # projected_image_features = self.image_features_projection(img)
 
         # repeat image feature vectors to be provided for every round
         # shape: (batch_size * num_rounds, num_proposals, lstm_hidden_size)
-        projected_image_features = (
+        '''projected_image_features = (
             projected_image_features.view(
                 batch_size, 1, -1, self.config["lstm_hidden_size"]
             )
@@ -102,7 +112,7 @@ class LateFusionEncoder(nn.Module):
             projected_ques_image
         ).squeeze()
         image_attention_weights = F.softmax(image_attention_weights, dim=-1)
-        image_attention_scores = image_attention_weights
+
         # shape: (batch_size * num_rounds, num_proposals, img_features_size)
         img = (
             img.view(batch_size, 1, -1, self.config["img_feature_size"])
@@ -118,7 +128,7 @@ class LateFusionEncoder(nn.Module):
         # shape: (batch_size * num_rounds, img_feature_size)
         attended_image_features = (image_attention_weights * img).sum(1)
         img = attended_image_features
-
+        '''
         # embed history
         hist = hist.view(batch_size * num_rounds, max_sequence_length * 20)
         hist_embed = self.word_embed(hist)
@@ -126,14 +136,22 @@ class LateFusionEncoder(nn.Module):
         # shape: (batch_size * num_rounds, lstm_hidden_size)
         _, (hist_embed, _) = self.hist_rnn(hist_embed, batch["hist_len"])
 
-        fused_vector = torch.cat((img, ques_embed, hist_embed), 1)
+
+        #caption size -> batch_size, 1, max_len
+        caption = caption.view(batch_size, max_sequence_length)
+        #caption size -> batch_size, maxlen
+        print("Caption shape after resize {}".format(caption.shape))
+        caption = self.word_embed(caption)
+        #embed caption -> batch_size * num rounds
+        _, (cap_embed, _) = self.caption_rnn(caption, batch["hist_len"][0])
+        cap_embed = cap_embed.repeat(num_rounds, 1)
+        #cap_embed (batch_size* num_rounds, lstm_hidden_size)
+        print("After lstm shape {}".format(cap_embed.shape))
+        
+        fused_vector = torch.cat((cap_embed, ques_embed, hist_embed), 1)
         fused_vector = self.dropout(fused_vector)
 
         fused_embedding = torch.tanh(self.fusion(fused_vector))
         # shape: (batch_size, num_rounds, lstm_hidden_size)
         fused_embedding = fused_embedding.view(batch_size, num_rounds, -1)
-        
-        # old code
-        #return fused_embedding
-
-        return fused_embedding, image_attention_scores
+        return fused_embedding
