@@ -1,5 +1,5 @@
 #from visdialch.encoders.lf_no_image import LateFusionEncoder
-from visdialch.encoders.lf import LateFusionEncoder
+from visdialch.encoders.lf_no_image import LateFusionEncoder
 
 
 def Encoder(model_config, *args):
