@@ -175,5 +175,6 @@ def load_checkpoint(checkpoint_pthpath):
             )
 
     # load encoder, decoder, optimizer state_dicts
-    components = torch.load(checkpoint_pthpath)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    components = torch.load(checkpoint_pthpath, map_location=device)
     return components["model"], components["optimizer"]
